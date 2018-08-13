@@ -11,7 +11,7 @@
 #include "opencv2/core.hpp"
 #include "opencv2/features2d.hpp"
 //#include "opencv2/flann.hpp"
-#include "opencv2/hal.hpp"
+#include "opencv2/core/hal/hal.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
@@ -45,6 +45,7 @@
 //#include "opencv2/imgproc/imgproc_c.h"
 
 //other headers
+#include "FrameAnalysis.h"
 
 //Definitions
 #define BUFFERLENGTH 256
@@ -89,7 +90,7 @@ public:
 
 	//Variables
 	CListBox mInfoList;
-	
+
 	cv::VideoCapture msCam;
 	cv::VideoCapture behavCam;
 	cv::Mat msFrame[BUFFERLENGTH];
@@ -101,6 +102,7 @@ public:
 	UINT16 behavWritePos;
 	UINT msCapFrameTime[BUFFERLENGTH];
 	UINT behavCapFrameTime[BUFFERLENGTH];
+	
 
 	UINT_PTR mTimer;
 	

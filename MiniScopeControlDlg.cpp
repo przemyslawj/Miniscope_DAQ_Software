@@ -15,7 +15,7 @@
 #include "opencv2/core.hpp"
 #include "opencv2/features2d.hpp"
 //#include "opencv2/flann.hpp"
-#include "opencv2/hal.hpp"
+#include "opencv2/core/hal/hal.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc.hpp"
@@ -484,14 +484,17 @@ void CMiniScopeControlDlg::OnBnClickedScopeconnect()
 		GetDlgItem(IDC_RECORD)->EnableWindow(TRUE);
 
 	cv::namedWindow("msCam",CV_WINDOW_NORMAL);// CV_WINDOW_NORMAL | CV_WINDOW_KEEPRATIO
-	cv::moveWindow("msCam", 1100,1);
+	cv::moveWindow("msCam", 850,1);
 	//cv::resizeWindow("msCam",752,480);
 	//cv::resizeWindow("msCam",1280,1024);
+	cv::namedWindow("dFOverF", CV_WINDOW_NORMAL);
+	cv::moveWindow("dFOverF", 850, 600);
+
 	msCam.open(mScopeCamID);
 	
 	//msCam.set(CV_CAP_PROP_CONVERT_RGB,FALSE); //Added to fix messed up top 8 bit of pixel stream
 
-	//str.Format(L"Mat Channel: %d", msFrame[0].channels());
+	//str.Format("Mat Channel: %d", msFrame[0].channels());
 	//		AddListText(str);
 	GetDlgItem(IDC_SCREENSHOT)->EnableWindow(TRUE);
 	GetDlgItem(IDC_COMBO1)->EnableWindow(TRUE);
@@ -700,7 +703,7 @@ UINT CMiniScopeControlDlg::msCapture(LPVOID pParam )
 
 	//cv::Mat trash;
 	//self->msCam.read(trash);
-
+	BlurredFrameBuffer frameBuffer(self->mMSFPS * 3, self->mMSFPS * 10);
 	while(1) {	
 		//Added for triggerable recording
 		if (self->mCheckTrigRec == true) {
@@ -724,24 +727,24 @@ UINT CMiniScopeControlDlg::msCapture(LPVOID pParam )
 		//-------------------------------
 		status = self->msCam.grab();
 		if (status == false) {
-			self->record = false;
-			self->AddListText(L"msCam frame grab error! Recording ended.");
-			break;
+			//self->record = false;
+			self->AddListText(L"msCam frame grab error! Skipping frame.");
+			continue;
 		}
 		previousTime = currentTime;
 		QueryPerformanceCounter(&currentTime);
 		self->mMSCurrentFPS = 1/(((double)currentTime.QuadPart - previousTime.QuadPart)/self->Frequency.QuadPart);
 		
 		self->msCapFrameTime[self->msWritePos%BUFFERLENGTH] = 1000*((double)currentTime.QuadPart - self->startOfRecord.QuadPart)/self->Frequency.QuadPart;
-		
+
 		status = self->msCam.retrieve(self->msFrame[self->msWritePos%BUFFERLENGTH]);
 		if (status == false) {
-			self->record = false; //Commented out to not end recording Daniel 11_10_2015
+			//self->record = false; //Commented out to not end recording Daniel 11_10_2015
 			self->mMSDroppedFrames++; //Added frame drop tracker Daniel 11_10_2015
-			self->AddListText(L"msCam frame retrieve error! Recording ended.");
+			self->AddListText(L"msCam frame retrieve error! Skipping frame.");
 			//self->dFrameDrop.ShowWindow(SW_SHOW);//popup dialog box Daniel 11_10_2015
 			cv::imshow("msCam",droppedFrameImage);
-			break; //removed break Daniel 11_10_2015
+			continue; //removed break Daniel 11_10_2015
 		}
 		else {//Added else Daniel 11_10_2015
 			if (self->getScreenShot == true) {
@@ -762,18 +765,12 @@ UINT CMiniScopeControlDlg::msCapture(LPVOID pParam )
 
 				cv::minMaxLoc(frame,&self->mMinFluor,&self->mMaxFluor);
 				frame.convertTo(frame, CV_8U, 255.0/(self->mMaxFluorDisplay - self->mMinFluorDisplay), -self->mMinFluorDisplay * 255.0/(self->mMaxFluorDisplay - self->mMinFluorDisplay));
+				cv::imshow("msCam", frame);
 
-				if (self->record == true)
-					//cv::imshow("msCam", self->msFrame[self->msWritePos%BUFFERLENGTH]);
-					cv::imshow("msCam",frame);//added to correct green color stream
-				else {
-					cv::Mat dst;
-					//cv::threshold(self->msFrame[self->msWritePos%BUFFERLENGTH],dst,self->mSaturationThresh,0,4);
-					//cv::threshold(frame,dst,self->mSaturationThresh,0,4);//added to correct green color stream
-					//cv::imshow("msCam", dst);
-					cv::imshow("msCam",frame);
-
-				}
+				frameBuffer.addFrame(&frame);
+				cv::Mat baselineFrame = frameBuffer.getBaseline();
+				cv::Mat dFOverFFrame = dFOverF(&baselineFrame, &frame);
+				cv::imshow("dFOverF", frame);
 			}
 			else { 
 				//cv::Mat frame;
